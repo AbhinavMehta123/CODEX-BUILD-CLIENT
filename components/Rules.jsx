@@ -1,12 +1,14 @@
 "use client";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import axios from "axios";
 
 export default function RulesSection() {
-  const rulesData = {
+  // ✅ keep your static fallback for instant render
+  const fallbackData = {
     sectionNumber: "03",
     title: "Codex",
     titleAccent: "Rules_",
-    // This is where your Rule Cards live
     cards: [
       { 
         id: "01", 
@@ -32,19 +34,37 @@ export default function RulesSection() {
         desc: "All packages must be declared. Hidden scripts lead to disqualification.",
         tag: "WHITELIST" 
       },
-    ]
+    ],
   };
+
+  // ✅ start with fallback, then update from backend
+  const [rulesData, setRulesData] = useState(fallbackData);
+
+  // ✅ Fetch data from your live backend API
+  useEffect(() => {
+    axios
+      .get("https://codex-build-backend.onrender.com/api/rules")
+      .then((res) => {
+        // handle both array or single object response safely
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          setRulesData(res.data[0]); // if backend returns an array
+        } else if (res.data) {
+          setRulesData(res.data); // if backend returns a single object
+        }
+      })
+      .catch((err) => console.error("Error fetching Rules data:", err));
+  }, []);
 
   const fadeIn = {
     hidden: { opacity: 0, y: 30 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.8 } }
+    visible: { opacity: 1, y: 0, transition: { duration: 0.8 } },
   };
 
   return (
     <section id="rules" className="relative py-32 bg-[#02040a] text-white font-mono">
       <div className="container mx-auto px-6 relative z-10">
         
-        {/* MATCHING HEADER */}
+        {/* HEADER */}
         <motion.div 
           initial="hidden"
           whileInView="visible"
@@ -66,7 +86,7 @@ export default function RulesSection() {
           </h3>
         </motion.div>
 
-        {/* THE RULE CARDS GRID */}
+        {/* CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {rulesData.cards.map((rule, i) => (
             <motion.div
@@ -77,7 +97,6 @@ export default function RulesSection() {
               viewport={{ once: true }}
               className="relative p-8 border border-white/10 bg-white/5 backdrop-blur-md group hover:border-cyan-500/50 transition-all duration-300"
             >
-              {/* Decorative ID tag */}
               <div className="flex justify-between items-start mb-6">
                 <span className="text-[10px] text-cyan-500 border border-cyan-500/30 px-2 py-1 uppercase tracking-widest font-bold">
                   {rule.tag}
@@ -94,7 +113,6 @@ export default function RulesSection() {
                 {rule.desc}
               </p>
 
-              {/* Corner accent that lights up on hover */}
               <div className="absolute top-0 right-0 w-4 h-4 border-t border-r border-white/10 group-hover:border-cyan-500 transition-colors" />
             </motion.div>
           ))}

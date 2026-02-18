@@ -1,9 +1,14 @@
 "use client";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import axios from "axios";
 
 export default function AboutSection() {
-  // BEYOND THIS POINT: This data would eventually come from your API/CMS
-  const aboutData = {
+  // ✅ Local state
+  const [aboutData, setAboutData] = useState(null);
+
+  // ✅ Fallback (instant load before API fetch)
+  const fallbackData = {
     sectionNumber: "02",
     title: "ABOUT",
     titleAccent: "CODEX_",
@@ -31,19 +36,39 @@ export default function AboutSection() {
     ]
   };
 
+  // ✅ Fetch data from your live backend API
+  useEffect(() => {
+    axios
+      .get("https://codex-build-backend.onrender.com/api/about")
+      .then((res) => {
+        // handle both array and object responses
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          setAboutData(res.data[0]); // if backend returns array
+        } else if (res.data) {
+          setAboutData(res.data); // if backend returns single object
+        }
+      })
+      .catch((err) => {
+        console.error("Error fetching About data:", err);
+      });
+  }, []);
+
+  // ✅ Use API data if available, fallback otherwise
+  const data = aboutData || fallbackData;
+
   const fadeIn = {
     hidden: { opacity: 0, y: 30 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } }
+    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } },
   };
 
+  // ✅ Everything below stays identical
   return (
     <section id="about" className="relative py-32 bg-[#02040a] text-white font-mono overflow-hidden">
       <div className="absolute top-0 right-0 w-1/2 h-full bg-cyan-500/5 blur-[120px] rounded-full pointer-events-none" />
 
       <div className="container mx-auto px-6 relative z-10">
-        
         {/* HEADER AREA */}
-        <motion.div 
+        <motion.div
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-100px" }}
@@ -56,17 +81,16 @@ export default function AboutSection() {
               <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
             </span>
             <h2 className="text-cyan-500 text-xs tracking-[0.5em] font-bold uppercase">
-              Section_{aboutData.sectionNumber} // Project_Identity
+              Section_{data.sectionNumber} // Project_Identity
             </h2>
           </div>
           <h3 className="text-4xl md:text-6xl font-black italic tracking-tighter">
-            {aboutData.title} <span className="text-cyan-500">{aboutData.titleAccent}</span>
+            {data.title} <span className="text-cyan-500">{data.titleAccent}</span>
           </h3>
         </motion.div>
 
         <div className="grid lg:grid-cols-2 gap-16 items-start">
-          
-          {/* LEFT COLUMN: DYNAMIC CONTENT */}
+          {/* LEFT COLUMN */}
           <motion.div
             initial="hidden"
             whileInView="visible"
@@ -74,14 +98,14 @@ export default function AboutSection() {
             variants={fadeIn}
           >
             <div className="space-y-6 text-slate-400 text-lg leading-relaxed max-w-xl">
-              {aboutData.description.map((para, idx) => (
+              {data.description.map((para, idx) => (
                 <p key={idx}>{para}</p>
               ))}
             </div>
 
             <div className="grid grid-cols-2 gap-4 mt-12">
-              {aboutData.stats.map((stat, i) => (
-                <motion.div 
+              {data.stats.map((stat, i) => (
+                <motion.div
                   key={i}
                   initial={{ opacity: 0, scale: 0.9 }}
                   whileInView={{ opacity: 1, scale: 1 }}
@@ -96,7 +120,7 @@ export default function AboutSection() {
             </div>
           </motion.div>
 
-          {/* RIGHT COLUMN: DYNAMIC SYSTEM LOGS */}
+          {/* RIGHT COLUMN */}
           <motion.div
             initial={{ opacity: 0, x: 50 }}
             whileInView={{ opacity: 1, x: 0 }}
@@ -109,11 +133,11 @@ export default function AboutSection() {
                 <div>
                   <h4 className="text-cyan-500 font-bold mb-4 tracking-tighter text-sm">&gt; SYSTEM_MANIFEST.LOG</h4>
                   <ul className="space-y-3 text-[11px] text-slate-500">
-                    {aboutData.logs.map((log, idx) => (
+                    {data.logs.map((log, idx) => (
                       <li key={idx} className="flex gap-4">
                         <span className={log.highlight ? "text-cyan-400 font-bold animate-pulse" : "text-cyan-500/50"}>
                           [{log.time}]
-                        </span> 
+                        </span>
                         {log.text}
                       </li>
                     ))}
@@ -123,7 +147,7 @@ export default function AboutSection() {
                 <div className="bg-cyan-500/10 border border-cyan-500/30 p-6 rounded-lg backdrop-blur-md">
                   <h5 className="text-white font-black text-sm uppercase mb-3 tracking-[0.2em]">The Protocol</h5>
                   <div className="space-y-2">
-                    {aboutData.rules.map((rule, idx) => (
+                    {data.rules.map((rule, idx) => (
                       <p key={idx} className="text-[11px] text-slate-400 leading-none italic">
                         {idx + 1}. {rule}
                       </p>
