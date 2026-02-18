@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
+import { socket } from "@/utils/socket";
 
 export default function StartBuild() {
   const [formData, setFormData] = useState({ name: "", domain: "" });
@@ -10,49 +11,17 @@ export default function StartBuild() {
   const [timeLeft, setTimeLeft] = useState(110 * 60);
   const [isActive, setIsActive] = useState(false);
   const [startTime, setStartTime] = useState(null);
+  const [waitingForHost, setWaitingForHost] = useState(false);
+  const [isCountdown, setIsCountdown] = useState(false);
+  const [count, setCount] = useState(3);
 
   // ✅ Sample fallback data (used if backend is unavailable)
   const fallbackDomains = [
-    {
-      name: "AI",
-      topics: [
-        "Neural Network Visualizer",
-        "Self-Correction Coding Agent",
-        "Predictive Infrastructure Bot",
-      ],
-    },
-    {
-      name: "Web3",
-      topics: [
-        "Decentralized Identity Vault",
-        "Gasless NFT Marketplace",
-        "DAO Governance Dashboard",
-      ],
-    },
-    {
-      name: "Cybersecurity",
-      topics: [
-        "Zero-Trust Access Gateway",
-        "Real-time Threat Map",
-        "Encrypted Packet Sniffer",
-      ],
-    },
-    {
-      name: "Fintech",
-      topics: [
-        "Automated Yield Aggregator",
-        "Fractional Asset Protocol",
-        "Real-time Fraud Detector",
-      ],
-    },
-    {
-      name: "Cloud Native",
-      topics: [
-        "Edge Computing Orchestrator",
-        "Serverless Event Mesh",
-        "Multi-Cloud Load Balancer",
-      ],
-    },
+    { name: "AI", topics: ["Neural Network Visualizer", "Self-Correction Coding Agent", "Predictive Infrastructure Bot"] },
+    { name: "Web3", topics: ["Decentralized Identity Vault", "Gasless NFT Marketplace", "DAO Governance Dashboard"] },
+    { name: "Cybersecurity", topics: ["Zero-Trust Access Gateway", "Real-time Threat Map", "Encrypted Packet Sniffer"] },
+    { name: "Fintech", topics: ["Automated Yield Aggregator", "Fractional Asset Protocol", "Real-time Fraud Detector"] },
+    { name: "Cloud Native", topics: ["Edge Computing Orchestrator", "Serverless Event Mesh", "Multi-Cloud Load Balancer"] },
   ];
 
   // ✅ Fetch available domains and topics from backend
@@ -63,7 +32,7 @@ export default function StartBuild() {
         if (res.data && res.data.length > 0) setDomains(res.data);
         else setDomains(fallbackDomains);
       })
-      .catch(() => setDomains(fallbackDomains)); // use sample data if backend fails
+      .catch(() => setDomains(fallbackDomains));
   }, []);
 
   // ✅ Verify participant session
@@ -77,7 +46,7 @@ export default function StartBuild() {
           setFormData({ name: data.name, domain: data.domain });
           setTopic(data.topic);
           setStartTime(data.startTime);
-          setIsActive(true);
+          setWaitingForHost(true); // wait for admin start
         })
         .catch(() => localStorage.removeItem("+t0N9wuQod3xw7YdHPbCJW5JzunVASltsSENOz9Ym6M="));
     }
@@ -89,28 +58,22 @@ export default function StartBuild() {
     if (!formData.name || !formData.domain) return;
 
     try {
-      const res = await axios.post(
-        "https://codex-build-backend.onrender.com/api/participant/StartBuild",
-        {
-          name: formData.name,
-          domain: formData.domain,
-        }
-      );
+      const res = await axios.post("https://codex-build-backend.onrender.com/api/participant/StartBuild", {
+        name: formData.name,
+        domain: formData.domain,
+      });
 
       const data = res.data;
       setTopic(data.topic);
-      setStartTime(data.startTime);
+      setWaitingForHost(true); // 👈 Wait for host
       localStorage.setItem("+t0N9wuQod3xw7YdHPbCJW5JzunVASltsSENOz9Ym6M=", data.token);
-      setIsActive(true);
     } catch (err) {
       console.error("Error starting build:", err);
-      // fallback if backend is offline — pick a random topic locally
       const selected = fallbackDomains.find((d) => d.name === formData.domain);
       if (selected) {
-        const randomTopic =
-          selected.topics[Math.floor(Math.random() * selected.topics.length)];
+        const randomTopic = selected.topics[Math.floor(Math.random() * selected.topics.length)];
         setTopic(randomTopic);
-        setIsActive(true);
+        setWaitingForHost(true);
         setStartTime(new Date().toISOString());
       }
     }
@@ -147,27 +110,100 @@ export default function StartBuild() {
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs
-      .toString()
-      .padStart(2, "0")}`;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
   // 🎞️ Animation Variants
   const containerVars = {
     hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { staggerChildren: 0.1, delayChildren: 0.2 },
-    },
+    visible: { opacity: 1, y: 0, transition: { staggerChildren: 0.1, delayChildren: 0.2 } },
   };
   const itemVars = {
     hidden: { opacity: 0, x: -10 },
     visible: { opacity: 1, x: 0 },
   };
 
+  // ✅ Real-time admin control
+  useEffect(() => {
+    socket.on("hackathon_started", (startTimeFromAdmin) => {
+      console.log("🔥 Hackathon starting soon!");
+      setIsCountdown(true);
+      setWaitingForHost(false);
+
+      let counter = 3;
+      const countdownInterval = setInterval(() => {
+        setCount(counter);
+        counter--;
+        if (counter < 0) {
+          clearInterval(countdownInterval);
+          setIsCountdown(false);
+          setStartTime(startTimeFromAdmin);
+          setIsActive(true);
+        }
+      }, 1000);
+    });
+
+    socket.on("hackathon_stopped", () => {
+      console.log("🛑 Hackathon stopped by admin");
+      setIsActive(false);
+    });
+
+    socket.on("connect", () => console.log("🟢 Connected to socket:", socket.id));
+
+    return () => {
+      socket.off("hackathon_started");
+      socket.off("hackathon_stopped");
+      socket.off("connect");
+    };
+  }, []);
+
   return (
     <main className="min-h-screen bg-[#02040a] text-cyan-400 font-mono p-6 flex flex-col items-center justify-center">
+      
+      {/* 🕒 Countdown Overlay */}
+      {isCountdown && (
+        <motion.div
+          key="countdown"
+          className="absolute inset-0 flex items-center justify-center bg-[#02040a] text-white text-8xl font-black z-50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          {count > 0 ? (
+            <motion.span
+              key={count}
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1.5, opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.8, ease: "easeInOut" }}
+              className="text-cyan-400 drop-shadow-[0_0_20px_rgba(6,182,212,0.8)]"
+            >
+              {count}
+            </motion.span>
+          ) : (
+            <motion.span
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1.2, opacity: 1 }}
+              className="text-4xl text-emerald-400 tracking-widest uppercase"
+            >
+              Timer Starting...
+            </motion.span>
+          )}
+        </motion.div>
+      )}
+
+      {/* ⏳ Waiting for Host */}
+      {waitingForHost && !isActive && !isCountdown && (
+        <motion.div
+          className="absolute inset-0 flex flex-col items-center justify-center text-center text-cyan-400 bg-[#02040a] z-50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          <p className="text-4xl font-black mb-4 animate-pulse">⏳ Waiting for host...</p>
+          <p className="text-sm text-slate-400 uppercase tracking-[0.3em]">Timer will start soon</p>
+        </motion.div>
+      )}
+
       <div className="w-full max-w-2xl relative">
         <AnimatePresence mode="wait">
           {!isActive ? (
@@ -182,56 +218,40 @@ export default function StartBuild() {
               className="bg-black/40 border border-cyan-500/20 p-10 rounded-xl backdrop-blur-3xl shadow-[0_0_50px_rgba(6,182,212,0.1)] space-y-10"
             >
               <motion.div variants={itemVars} className="text-center mb-4">
-                <h2 className="text-[10px] tracking-[0.8em] text-cyan-500 uppercase font-bold">
-                  Initial_Entry_Protocol
-                </h2>
+                <h2 className="text-[10px] tracking-[0.8em] text-cyan-500 uppercase font-bold">Initial_Entry_Protocol</h2>
               </motion.div>
 
               <motion.div variants={itemVars}>
-                <label className="block text-[9px] uppercase tracking-widest mb-4 text-cyan-500/40 font-bold italic">
-                  01. Identity_Check
-                </label>
+                <label className="block text-[9px] uppercase tracking-widest mb-4 text-cyan-500/40 font-bold italic">01. Identity_Check</label>
                 <input
                   type="text"
                   required
                   value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="INPUT_FULL_NAME"
                   className="w-full bg-cyan-500/5 border-b border-cyan-500/30 p-4 text-white focus:outline-none focus:border-cyan-500 transition-all rounded-t-md placeholder:text-slate-800 text-lg"
                 />
               </motion.div>
 
               <motion.div variants={itemVars}>
-                <label className="block text-[9px] uppercase tracking-widest mb-4 text-cyan-500/40 font-bold italic">
-                  02. Select_Architecture_Type
-                </label>
+                <label className="block text-[9px] uppercase tracking-widest mb-4 text-cyan-500/40 font-bold italic">02. Select_Architecture_Type</label>
                 <div className="relative group">
                   <select
                     required
                     value={formData.domain}
-                    onChange={(e) =>
-                      setFormData({ ...formData, domain: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
                     className="w-full bg-cyan-500/5 border-b border-cyan-500/30 p-4 text-white appearance-none focus:outline-none focus:border-cyan-500 cursor-pointer transition-all text-lg"
                   >
                     <option value="" disabled className="bg-[#02040a]">
                       SELECT_DOMAIN
                     </option>
                     {domains.map((d) => (
-                      <option
-                        key={d.name}
-                        value={d.name}
-                        className="bg-[#02040a] text-white italic uppercase"
-                      >
+                      <option key={d.name} value={d.name} className="bg-[#02040a] text-white italic uppercase">
                         {d.name}
                       </option>
                     ))}
                   </select>
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-cyan-500 group-hover:animate-bounce">
-                    ▼
-                  </div>
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-cyan-500 group-hover:animate-bounce">▼</div>
                 </div>
               </motion.div>
 
@@ -254,27 +274,19 @@ export default function StartBuild() {
               transition={{ type: "spring", damping: 15, stiffness: 100 }}
               className="flex flex-col items-center"
             >
-              <motion.div
-                initial={{ y: -50 }}
-                animate={{ y: 0 }}
-                className="text-center mb-16"
-              >
+              <motion.div initial={{ y: -50 }} animate={{ y: 0 }} className="text-center mb-16">
                 <div className="text-8xl md:text-[160px] font-black text-white drop-shadow-[0_0_40px_rgba(6,182,212,0.4)] tabular-nums leading-none">
                   {formatTime(timeLeft)}
                 </div>
                 <div className="mt-4 flex items-center justify-center gap-4">
                   <span className="h-[1px] w-12 bg-emerald-500/50" />
-                  <span className="text-[10px] text-emerald-500 tracking-[0.5em] animate-pulse font-bold">
-                    DEPLOYMENT_ACTIVE
-                  </span>
+                  <span className="text-[10px] text-emerald-500 tracking-[0.5em] animate-pulse font-bold">DEPLOYMENT_ACTIVE</span>
                   <span className="h-[1px] w-12 bg-emerald-500/50" />
                 </div>
               </motion.div>
 
               <div className="w-full bg-white/5 border border-white/10 p-12 rounded-2xl backdrop-blur-md text-center">
-                <p className="text-[10px] text-cyan-500/50 mb-2 uppercase tracking-widest italic">
-                  Target_Objective_Locked
-                </p>
+                <p className="text-[10px] text-cyan-500/50 mb-2 uppercase tracking-widest italic">Target_Objective_Locked</p>
                 <motion.h3
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
