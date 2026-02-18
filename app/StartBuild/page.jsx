@@ -58,7 +58,7 @@ export default function StartBuild() {
   // ✅ Fetch available domains and topics from backend
   useEffect(() => {
     axios
-      .get("https://codex-build-backend.onrender.com/api/domains")
+      .get("https://codex-build-backend.onrender.com/api/domains-with-topics")
       .then((res) => {
         if (res.data && res.data.length > 0) setDomains(res.data);
         else setDomains(fallbackDomains);
@@ -68,7 +68,7 @@ export default function StartBuild() {
 
   // ✅ Verify participant session
   useEffect(() => {
-    const token = localStorage.getItem("codex_token");
+    const token = localStorage.getItem("+t0N9wuQod3xw7YdHPbCJW5JzunVASltsSENOz9Ym6M=");
     if (token) {
       axios
         .post("https://codex-build-backend.onrender.com/api/participant/verify", { token })
@@ -79,7 +79,7 @@ export default function StartBuild() {
           setStartTime(data.startTime);
           setIsActive(true);
         })
-        .catch(() => localStorage.removeItem("codex_token"));
+        .catch(() => localStorage.removeItem("+t0N9wuQod3xw7YdHPbCJW5JzunVASltsSENOz9Ym6M="));
     }
   }, []);
 
@@ -100,7 +100,7 @@ export default function StartBuild() {
       const data = res.data;
       setTopic(data.topic);
       setStartTime(data.startTime);
-      localStorage.setItem("codex_token", data.token);
+      localStorage.setItem("+t0N9wuQod3xw7YdHPbCJW5JzunVASltsSENOz9Ym6M=", data.token);
       setIsActive(true);
     } catch (err) {
       console.error("Error starting build:", err);
