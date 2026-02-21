@@ -12,9 +12,8 @@ export default function Footer() {
       { name: "Rules", href: "#rules" },
     ],
     social: [
-      { name: "GitHub", href: "https://github.com" },
-      { name: "Discord", href: "https://discord.com" },
-      { name: "X", href: "https://x.com" },
+      { name: "Instagram", href: "https://instagram.com" },
+      { name: "LinkedIN", href: "https://linkedin.com" },
     ]
   };
 
@@ -47,7 +46,7 @@ export default function Footer() {
               <p className="text-[10px] text-slate-600 tracking-[0.2em] uppercase mb-2">Developed_By:</p>
               <div className="inline-flex items-center gap-3 px-3 py-2 border border-cyan-500/20 bg-cyan-500/5 rounded-sm hover:border-cyan-500/50 transition-colors group">
                 <span className="text-xs font-black text-white tracking-widest group-hover:text-cyan-400 transition-colors">
-                  ALFA CODING CLUB
+                <a href="https://alfacodingclub.com">ALFA CODING CLUB</a>
                 </span>
                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse shadow-[0_0_8px_#06b6d4]" />
               </div>
