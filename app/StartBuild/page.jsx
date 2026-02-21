@@ -303,13 +303,14 @@ export default function StartBuild() {
               ))}
 
               <motion.button
-                variants={itemVars}
-                whileHover={{ scale: 1.02, letterSpacing: "0.5em" }}
-                type="submit"
-                className="w-full bg-cyan-500 py-6 text-black font-black uppercase tracking-[0.3em] text-sm shadow-[0_0_20px_rgba(6,182,212,0.4)]"
-              >
-                COMPILE & START
-              </motion.button>
+            variants={itemVars}
+            whileHover={{ scale: 1.02, letterSpacing: "0.4em" }}
+            whileTap={{ scale: 0.98 }}
+            type="submit"
+            className="w-full bg-cyan-500 py-6 text-black font-black uppercase tracking-[0.3em] text-sm shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:bg-white transition-all duration-500 cursor-pointer"
+          >
+            COMPILE & START
+          </motion.button>
             </motion.form>
           ) : (
             <motion.div
