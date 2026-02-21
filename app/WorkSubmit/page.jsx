@@ -2,8 +2,11 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import axios from "axios";
+import { useRouter } from "next/navigation";
 
 export default function WorkSubmit() {
+  const router = useRouter();
+
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -12,9 +15,11 @@ export default function WorkSubmit() {
   });
 
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     const { name, phone, projectDescription, githubRepo } = formData;
 
     if (!name || !phone || !projectDescription || !githubRepo) {
@@ -22,17 +27,33 @@ export default function WorkSubmit() {
       return;
     }
 
+    // Extra phone validation
+    if (!/^\d{10}$/.test(phone)) {
+      alert("Phone number must be exactly 10 digits.");
+      return;
+    }
+
     try {
+      setLoading(true);
+
       const res = await axios.post(
         "https://codex-build-backend.onrender.com/api/work/submit",
         formData
       );
+
       if (res.data.success) {
         setIsSubmitted(true);
+
+        // Redirect after 3 seconds
+        setTimeout(() => {
+          router.push("/"); // Redirect to home page
+        }, 3000);
       }
     } catch (err) {
       console.error("Submission error:", err);
       alert("Failed to submit work. Please try again later.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -73,6 +94,7 @@ export default function WorkSubmit() {
               <label className="block text-[9px] uppercase tracking-widest mb-4 text-cyan-500/40 font-bold italic">
                 {`0${i + 1}. ${field.label}`}
               </label>
+
               {field.id === "projectDescription" ? (
                 <textarea
                   required
@@ -81,6 +103,20 @@ export default function WorkSubmit() {
                   onChange={(e) => setFormData({ ...formData, [field.id]: e.target.value })}
                   placeholder={field.placeholder}
                   className="w-full bg-cyan-500/5 border-b border-cyan-500/30 p-4 text-white focus:outline-none focus:border-cyan-500 transition-all rounded-md placeholder:text-slate-800 text-lg"
+                />
+              ) : field.id === "phone" ? (
+                <input
+                  type="tel"
+                  required
+                  value={formData[field.id]}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, ""); // allow only numbers
+                    setFormData({ ...formData, [field.id]: value });
+                  }}
+                  placeholder={field.placeholder}
+                  pattern="\d{10}" // exactly 10 digits
+                  title="Phone number must be 10 digits"
+                  className="w-full bg-cyan-500/5 border-b border-cyan-500/30 p-4 text-white focus:outline-none focus:border-cyan-500 transition-all rounded-t-md placeholder:text-slate-800 text-lg"
                 />
               ) : (
                 <input
@@ -100,9 +136,10 @@ export default function WorkSubmit() {
             whileHover={{ scale: 1.02, letterSpacing: "0.4em" }}
             whileTap={{ scale: 0.98 }}
             type="submit"
-            className="w-full bg-cyan-500 py-6 text-black font-black uppercase tracking-[0.3em] text-sm shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:bg-white transition-all duration-500 cursor-pointer"
+            disabled={loading}
+            className="w-full bg-cyan-500 py-6 text-black font-black uppercase tracking-[0.3em] text-sm shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:bg-white transition-all duration-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            SUBMIT WORK
+            {loading ? "Submitting..." : "SUBMIT WORK"}
           </motion.button>
         </motion.form>
       ) : (
@@ -116,7 +153,7 @@ export default function WorkSubmit() {
             ✅ Work Submitted Successfully!
           </h1>
           <p className="text-slate-400 text-sm uppercase tracking-[0.2em]">
-            Thank you for submitting your project. The judges will review your work.
+            Redirecting to homepage...
           </p>
         </motion.div>
       )}
