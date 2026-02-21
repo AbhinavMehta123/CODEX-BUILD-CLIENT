@@ -74,6 +74,12 @@ export default function StartBuild() {
       return;
     }
 
+    // ✅ Validate phone number
+    const phoneRegex = /^[6-9]\d{9}$/; // Indian 10-digit format, starts 6–9
+    if (!phoneRegex.test(phone)) {
+      alert("Please enter a valid 10-digit phone number.");
+      return;
+    }
     try {
       const res = await axios.post("https://codex-build-backend.onrender.com/api/StartBuild", {
         name,
@@ -175,8 +181,10 @@ export default function StartBuild() {
     socket.on("hackathon_stopped", () => {
       setIsActive(false);
       setStartTime(null);
-      setWaitingForHost(false);
       setTopic("");
+      setHasFinished(false);
+      setIsCountdown(false);
+      setWaitingForHost(true); // 👈 Redirects to Waiting Room
     });
 
     return () => {
@@ -202,7 +210,7 @@ export default function StartBuild() {
 
   return (
     <main className="min-h-screen bg-[#02040a] text-cyan-400 font-mono p-6 flex flex-col items-center justify-center relative">
-      
+
       {/* 🎉 Thank You Screen (Now prioritized via hasFinished) */}
       {hasFinished && (
         <motion.div
@@ -303,14 +311,14 @@ export default function StartBuild() {
               ))}
 
               <motion.button
-            variants={itemVars}
-            whileHover={{ scale: 1.02, letterSpacing: "0.4em" }}
-            whileTap={{ scale: 0.98 }}
-            type="submit"
-            className="w-full bg-cyan-500 py-6 text-black font-black uppercase tracking-[0.3em] text-sm shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:bg-white transition-all duration-500 cursor-pointer"
-          >
-            COMPILE & START
-          </motion.button>
+                variants={itemVars}
+                whileHover={{ scale: 1.02, letterSpacing: "0.4em" }}
+                whileTap={{ scale: 0.98 }}
+                type="submit"
+                className="w-full bg-cyan-500 py-6 text-black font-black uppercase tracking-[0.3em] text-sm shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:bg-white transition-all duration-500 cursor-pointer"
+              >
+                COMPILE & START
+              </motion.button>
             </motion.form>
           ) : (
             <motion.div

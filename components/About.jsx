@@ -122,52 +122,54 @@ export default function AboutSection() {
 
           {/* RIGHT COLUMN */}
           <motion.div
-  initial={{ opacity: 0, x: 50 }}
-  whileInView={{ opacity: 1, x: 0 }}
-  viewport={{ once: true }}
-  transition={{ duration: 0.8, delay: 0.2 }}
-  className="relative"
->
-  <div className="relative border border-cyan-500/20 rounded-2xl overflow-hidden p-4 bg-black/40 shadow-2xl max-h-[420px]">
-    <div className="relative h-full flex flex-col justify-between">
-      <div>
-        <h4 className="text-cyan-500 font-bold mb-3 tracking-tighter text-xs">&gt; SYSTEM_MANIFEST.LOG</h4>
-        <ul className="space-y-2 text-[10px] text-slate-500 overflow-y-auto max-h-[220px] pr-2">
-          {data.logs.map((log, idx) => (
-            <li key={idx} className="flex gap-3">
-              <span
-                className={
-                  log.highlight
-                    ? "text-cyan-400 font-bold animate-pulse"
-                    : "text-cyan-500/50"
-                }
-              >
-                [{log.time}]
-              </span>
-              {log.text}
-            </li>
-          ))}
-        </ul>
-      </div>
+            initial={{ opacity: 0, x: 50 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="relative"
+          >
+            <div className="relative border border-cyan-500/20 rounded-2xl overflow-hidden p-7 bg-black/40 shadow-2xl max-h-[580px]">
+              <div className="relative h-full flex flex-col justify-between">
+                <div>
+                  <h4 className="text-cyan-500 font-bold mb-5 tracking-tighter text-sm sm:text-base">
+                    &gt; SYSTEM_MANIFEST.LOG
+                  </h4>
+                  <ul className="space-y-3 text-[12px] text-slate-500 overflow-y-auto max-h-[320px] pr-2">
+                    {data.logs.map((log, idx) => (
+                      <li key={idx} className="flex gap-4">
+                        <span
+                          className={
+                            log.highlight
+                              ? "text-cyan-400 font-bold animate-pulse"
+                              : "text-cyan-500/50"
+                          }
+                        >
+                          [{log.time}]
+                        </span>
+                        {log.text}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
 
-      <div className="bg-cyan-500/10 border border-cyan-500/30 p-4 rounded-lg backdrop-blur-md mt-4">
-        <h5 className="text-white font-black text-xs uppercase mb-2 tracking-[0.15em]">
-          The Protocol
-        </h5>
-        <div className="space-y-1.5">
-          {data.rules.map((rule, idx) => (
-            <p
-              key={idx}
-              className="text-[10px] text-slate-400 leading-tight italic"
-            >
-              {idx + 1}. {rule}
-            </p>
-          ))}
-        </div>
-      </div>
-    </div>
-  </div>
-</motion.div>
+                <div className="bg-cyan-500/10 border border-cyan-500/30 p-6 rounded-lg backdrop-blur-md mt-6">
+                  <h5 className="text-white font-black text-sm sm:text-base uppercase mb-3 tracking-[0.18em]">
+                    The Protocol
+                  </h5>
+                  <div className="space-y-2.5">
+                    {data.rules.map((rule, idx) => (
+                      <p
+                        key={idx}
+                        className="text-[12px] text-slate-400 leading-snug italic"
+                      >
+                        {idx + 1}. {rule}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         </div>
       </div>
     </section>
