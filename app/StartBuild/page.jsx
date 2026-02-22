@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
 import { socket } from "@/utils/socket";
@@ -12,28 +12,51 @@ export default function StartBuild() {
   const [startTime, setStartTime] = useState(null);
   const [waitingForHost, setWaitingForHost] = useState(false);
   const [isCountdown, setIsCountdown] = useState(false);
-  const [hasFinished, setHasFinished] = useState(false); // New: Tracks session completion
+  const [hasFinished, setHasFinished] = useState(false);
   const [count, setCount] = useState(3);
   const [loading, setLoading] = useState(true);
+  const [statusChecked, setStatusChecked] = useState(false);
 
   const TOKEN_KEY = "+t0N9wuQod3xw7YdHPbCJW5JzunVASltsSENOz9Ym6M=";
+  const hasLoadedOnce = useRef(false);
 
-  // ✅ Clean out old localStorage data but preserve token on mount
+  // ✅ Preserve both token and activeSession
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY);
+    const activeSession = localStorage.getItem("activeSession");
     localStorage.clear();
     if (token) localStorage.setItem(TOKEN_KEY, token);
+    if (activeSession) localStorage.setItem("activeSession", activeSession);
   }, []);
 
-  // ✅ Verify participant and restore from backend
+  // ✅ Restore active timer + topic session before backend calls
   useEffect(() => {
-    const token = localStorage.getItem(TOKEN_KEY);
+    const savedSession = localStorage.getItem("activeSession");
+    if (savedSession) {
+      const { startTime, topic, isActive } = JSON.parse(savedSession);
+      if (topic) setTopic(topic); // 🆕 always restore saved topic
+      if (isActive && startTime) {
+        setStartTime(startTime);
+        setIsActive(true);
+        setWaitingForHost(false);
+        setHasFinished(false);
+        setLoading(false);
+        setStatusChecked(true);
+        return; // ⛔ Skip backend check if timer already active
+      }
+    }
 
+    // ✅ Verify participant and backend status
+    const token = localStorage.getItem(TOKEN_KEY);
     if (token) {
-      axios
-        .post("https://codex-build-backend.onrender.com/api/participant/verify", { token })
-        .then((res) => {
-          const data = res.data || {};
+      Promise.all([
+        axios.post("https://codex-build-backend.onrender.com/api/participant/verify", { token }),
+        axios.get("https://codex-build-backend.onrender.com/api/hackathon/status"),
+      ])
+        .then(([verifyRes, statusRes]) => {
+          const data = verifyRes.data || {};
+          const status = statusRes.data || {};
+
           if (!data.name) throw new Error("Invalid or expired participant");
 
           setFormData({
@@ -43,29 +66,56 @@ export default function StartBuild() {
             course: data.course || "",
           });
 
-          if (data.topic) setTopic(data.topic);
-          if (data.startTime) {
-            setStartTime(data.startTime);
+          if (data.topic) {
+            setTopic(data.topic);
+
+            // 🆕 persist topic from backend verification
+            const session = JSON.parse(localStorage.getItem("activeSession") || "{}");
+            localStorage.setItem("activeSession", JSON.stringify({
+              ...session,
+              topic: data.topic,
+            }));
+          }
+
+          if (status.isActive && status.startTime) {
+            setStartTime(status.startTime);
             setIsActive(true);
+            setWaitingForHost(false);
           } else {
+            setIsActive(false);
+            setStartTime(null);
             setWaitingForHost(true);
           }
         })
         .catch(() => {
-          // If data is deleted from backend, reset to registration form
           setFormData({ name: "", phone: "", college: "", course: "" });
           setIsActive(false);
           setStartTime(null);
           setWaitingForHost(false);
           setHasFinished(false);
         })
-        .finally(() => setLoading(false));
+        .finally(() => {
+          setStatusChecked(true);
+          setLoading(false);
+        });
     } else {
+      setStatusChecked(true);
       setLoading(false);
     }
   }, []);
 
-  // ✅ Handle Start Build
+  // ✅ persist topic changes anytime it's updated
+  useEffect(() => {
+    if (topic) {
+      const session = JSON.parse(localStorage.getItem("activeSession") || "{}");
+      localStorage.setItem("activeSession", JSON.stringify({
+        ...session,
+        topic,
+      }));
+    }
+  }, [topic]);
+
+  // ✅ Handle Start Build form
   const handleStart = async (e) => {
     e.preventDefault();
     const { name, phone, college, course } = formData;
@@ -74,12 +124,12 @@ export default function StartBuild() {
       return;
     }
 
-    // ✅ Validate phone number
-    const phoneRegex = /^[6-9]\d{9}$/; // Indian 10-digit format, starts 6–9
+    const phoneRegex = /^[6-9]\d{9}$/;
     if (!phoneRegex.test(phone)) {
       alert("Please enter a valid 10-digit phone number.");
       return;
     }
+
     try {
       const res = await axios.post("https://codex-build-backend.onrender.com/api/StartBuild", {
         name,
@@ -101,9 +151,9 @@ export default function StartBuild() {
     }
   };
 
-  // ✅ Timer logic synced with backend startTime
+  // ✅ Timer logic
   useEffect(() => {
-    if (!startTime || !isActive) return;
+    if (!startTime || !isActive || hasFinished || waitingForHost) return;
 
     const endTime = new Date(startTime).getTime() + 110 * 60 * 1000;
 
@@ -115,18 +165,30 @@ export default function StartBuild() {
       if (diff === 0) {
         playAlarm();
         setIsActive(false);
-        setHasFinished(true); // Only show thank you screen when timer naturally hits zero
+        setHasFinished(true);
         setStartTime(null);
         setWaitingForHost(false);
+        localStorage.removeItem("activeSession");
       }
     };
 
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [startTime, isActive]);
+  }, [startTime, isActive, hasFinished, waitingForHost]);
+
+  // 🆕 Compute timeLeft instantly on reload
+  useEffect(() => {
+    if (isActive && startTime) {
+      const endTime = new Date(startTime).getTime() + 110 * 60 * 1000;
+      const now = new Date().getTime();
+      const diff = Math.max(0, Math.floor((endTime - now) / 1000));
+      setTimeLeft(diff);
+    }
+  }, [isActive, startTime]);
 
   const playAlarm = () => {
+    localStorage.removeItem("activeSession");
     const audio = new Audio("/alarm.mp3");
     audio.play().catch((err) => console.log("Audio playback error:", err));
     alert("⏰ Time's up! 110 minutes completed.");
@@ -144,6 +206,9 @@ export default function StartBuild() {
   // ✅ Socket Events
   useEffect(() => {
     socket.on("hackathon_started", (payload) => {
+      if (hasLoadedOnce.current) return;
+      hasLoadedOnce.current = true;
+
       setIsCountdown(true);
       setWaitingForHost(false);
 
@@ -174,23 +239,54 @@ export default function StartBuild() {
           setStartTime(effectiveStart);
           setIsActive(true);
           setHasFinished(false);
+
+          // ✅ Save session persistently with topic
+          localStorage.setItem("activeSession", JSON.stringify({
+            startTime: effectiveStart,
+            topic: backendTopic,
+            isActive: true,
+          }));
         }
       }, 1000);
     });
 
     socket.on("hackathon_stopped", () => {
+      localStorage.removeItem("activeSession");
+      hasLoadedOnce.current = false;
       setIsActive(false);
       setStartTime(null);
       setTopic("");
       setHasFinished(false);
       setIsCountdown(false);
-      setWaitingForHost(true); // 👈 Redirects to Waiting Room
+      setWaitingForHost(true);
     });
 
     return () => {
       socket.off("hackathon_started");
       socket.off("hackathon_stopped");
     };
+  }, []);
+
+  // ✅ Check hackathon status via socket
+  useEffect(() => {
+    socket.emit("check_hackathon_status");
+
+    socket.on("hackathon_status", (status) => {
+      if (status?.isActive) {
+        hasLoadedOnce.current = true;
+        setIsActive(true);
+        setWaitingForHost(false);
+        setStartTime(status.startTime);
+        setHasFinished(false);
+      } else {
+        hasLoadedOnce.current = false;
+        setIsActive(false);
+        setStartTime(null);
+        setWaitingForHost(true);
+      }
+    });
+
+    return () => socket.off("hackathon_status");
   }, []);
 
   const containerVars = {
@@ -200,7 +296,8 @@ export default function StartBuild() {
 
   const itemVars = { hidden: { opacity: 0, x: -10 }, visible: { opacity: 1, x: 0 } };
 
-  if (loading) {
+  // ✅ Loader while verifying
+  if (loading || !statusChecked) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-[#02040a] text-cyan-400 font-mono">
         <p className="animate-pulse text-xl">Verifying participant...</p>
@@ -208,10 +305,9 @@ export default function StartBuild() {
     );
   }
 
+  // 🧱 UI below unchanged
   return (
     <main className="min-h-screen bg-[#02040a] text-cyan-400 font-mono p-6 flex flex-col items-center justify-center relative">
-
-      {/* 🎉 Thank You Screen (Now prioritized via hasFinished) */}
       {hasFinished && (
         <motion.div
           key="thank-you"
@@ -239,7 +335,6 @@ export default function StartBuild() {
         </motion.div>
       )}
 
-      {/* 🕒 Countdown Overlay */}
       {isCountdown && (
         <motion.div
           className="absolute inset-0 flex items-center justify-center bg-[#02040a] text-white text-8xl font-black z-50"
@@ -256,7 +351,6 @@ export default function StartBuild() {
         </motion.div>
       )}
 
-      {/* ⏳ Waiting for Host */}
       {waitingForHost && !isActive && !isCountdown && !hasFinished && (
         <motion.div
           className="absolute inset-0 flex flex-col items-center justify-center text-center text-cyan-400 bg-[#02040a] z-50 p-8"
@@ -277,7 +371,6 @@ export default function StartBuild() {
         </motion.div>
       )}
 
-      {/* 🎯 Main UI */}
       <div className="w-full max-w-2xl relative">
         <AnimatePresence mode="wait">
           {!isActive ? (
@@ -338,7 +431,9 @@ export default function StartBuild() {
 
               <div className="w-full bg-white/5 border border-white/10 p-12 rounded-2xl backdrop-blur-md text-center">
                 <p className="text-[10px] text-cyan-500/50 mb-2 uppercase tracking-widest italic">Target_Objective_Locked</p>
-                <h3 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-300 to-white italic">"{topic}"</h3>
+                <h3 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-300 to-white italic">
+                  "{topic}"
+                </h3>
                 <div className="mt-10 pt-6 border-t border-white/5 flex justify-between items-center text-[9px] text-slate-500 font-bold uppercase tracking-widest">
                   <span>Arch: {formData.name}</span>
                   <span>Sector: {formData.college}</span>
