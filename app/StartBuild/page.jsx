@@ -29,12 +29,14 @@ export default function StartBuild() {
     if (activeSession) localStorage.setItem("activeSession", activeSession);
   }, []);
 
-  // ✅ Restore active timer + topic session before backend calls
+  // ✅ Restore saved session first
   useEffect(() => {
     const savedSession = localStorage.getItem("activeSession");
     if (savedSession) {
-      const { startTime, topic, isActive } = JSON.parse(savedSession);
-      if (topic) setTopic(topic); // 🆕 always restore saved topic
+      const { startTime, topic, name, isActive } = JSON.parse(savedSession);
+      if (topic) setTopic(topic);
+      if (name) setFormData((prev) => ({ ...prev, name }));
+
       if (isActive && startTime) {
         setStartTime(startTime);
         setIsActive(true);
@@ -42,7 +44,7 @@ export default function StartBuild() {
         setHasFinished(false);
         setLoading(false);
         setStatusChecked(true);
-        return; // ⛔ Skip backend check if timer already active
+        return;
       }
     }
 
@@ -66,16 +68,7 @@ export default function StartBuild() {
             course: data.course || "",
           });
 
-          if (data.topic) {
-            setTopic(data.topic);
-
-            // 🆕 persist topic from backend verification
-            const session = JSON.parse(localStorage.getItem("activeSession") || "{}");
-            localStorage.setItem("activeSession", JSON.stringify({
-              ...session,
-              topic: data.topic,
-            }));
-          }
+          if (data.topic) setTopic(data.topic);
 
           if (status.isActive && status.startTime) {
             setStartTime(status.startTime);
@@ -104,16 +97,22 @@ export default function StartBuild() {
     }
   }, []);
 
-  // ✅ persist topic changes anytime it's updated
+  // ✅ Keep topic + name + timer saved in localStorage
   useEffect(() => {
-    if (topic) {
-      const session = JSON.parse(localStorage.getItem("activeSession") || "{}");
-      localStorage.setItem("activeSession", JSON.stringify({
-        ...session,
-        topic,
-      }));
+    if (isActive && startTime) {
+      const existing = JSON.parse(localStorage.getItem("activeSession") || "{}");
+      localStorage.setItem(
+        "activeSession",
+        JSON.stringify({
+          ...existing,
+          startTime,
+          topic,
+          name: formData.name,
+          isActive,
+        })
+      );
     }
-  }, [topic]);
+  }, [isActive, startTime, topic, formData.name]);
 
   // ✅ Handle Start Build form
   const handleStart = async (e) => {
@@ -142,9 +141,18 @@ export default function StartBuild() {
       if (data.topic) setTopic(data.topic);
       setWaitingForHost(true);
 
-      if (data.token) {
-        localStorage.setItem(TOKEN_KEY, data.token);
-      }
+      if (data.token) localStorage.setItem(TOKEN_KEY, data.token);
+
+      // ✅ Save participant info locally
+      localStorage.setItem(
+        "participantData",
+        JSON.stringify({
+          formData,
+          topic: data.topic || "",
+          sector: data.sector || "" ,
+          token: data.token || "",
+        })
+      );
     } catch (err) {
       console.error("Error starting build:", err);
       alert("Backend not reachable. Please try again later.");
@@ -168,7 +176,7 @@ export default function StartBuild() {
         setHasFinished(true);
         setStartTime(null);
         setWaitingForHost(false);
-        localStorage.removeItem("activeSession");
+        localStorage.removeItem("activeSession"); // ✅ Clear saved timer session
       }
     };
 
@@ -177,7 +185,7 @@ export default function StartBuild() {
     return () => clearInterval(interval);
   }, [startTime, isActive, hasFinished, waitingForHost]);
 
-  // 🆕 Compute timeLeft instantly on reload
+  // 🧠 Compute time instantly after reload
   useEffect(() => {
     if (isActive && startTime) {
       const endTime = new Date(startTime).getTime() + 110 * 60 * 1000;
@@ -198,9 +206,7 @@ export default function StartBuild() {
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    return `${hrs.toString().padStart(2, "0")}:${mins
-      .toString()
-      .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+    return `${hrs.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
   // ✅ Socket Events
@@ -240,12 +246,16 @@ export default function StartBuild() {
           setIsActive(true);
           setHasFinished(false);
 
-          // ✅ Save session persistently with topic
-          localStorage.setItem("activeSession", JSON.stringify({
-            startTime: effectiveStart,
-            topic: backendTopic,
-            isActive: true,
-          }));
+          // ✅ Save full session (topic + name + timer)
+          localStorage.setItem(
+            "activeSession",
+            JSON.stringify({
+              startTime: effectiveStart,
+              topic: backendTopic || topic,
+              name: formData.name || "",
+              isActive: true,
+            })
+          );
         }
       }, 1000);
     });
@@ -289,6 +299,14 @@ export default function StartBuild() {
     return () => socket.off("hackathon_status");
   }, []);
 
+  // ✅ Clear session after finishing
+  useEffect(() => {
+    if (hasFinished) {
+      localStorage.removeItem("activeSession");
+      localStorage.removeItem("participantData");
+    }
+  }, [hasFinished]);
+
   const containerVars = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { staggerChildren: 0.1, delayChildren: 0.2 } },
@@ -296,7 +314,7 @@ export default function StartBuild() {
 
   const itemVars = { hidden: { opacity: 0, x: -10 }, visible: { opacity: 1, x: 0 } };
 
-  // ✅ Loader while verifying
+  // ✅ Loader
   if (loading || !statusChecked) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-[#02040a] text-cyan-400 font-mono">
