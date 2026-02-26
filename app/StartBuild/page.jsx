@@ -380,10 +380,12 @@ export default function StartBuild() {
           <div className="max-w-md text-left text-slate-400 space-y-2 border border-cyan-500/20 rounded-xl p-6 bg-black/30 backdrop-blur-md">
             <h3 className="text-cyan-300 text-sm uppercase tracking-widest mb-3">Rules & Guidelines:</h3>
             <ul className="list-disc list-inside text-xs leading-relaxed">
-              <li>Do not refresh or close the page after joining.</li>
-              <li>Wait until the host starts the timer.</li>
-              <li>You will have 110 minutes once the timer begins.</li>
-              <li>Submit your project only after the timer ends.</li>
+              <li>Devices: Participants must bring there own laptops. Hight speed internet will be provided.</li>
+              <li>AI Tools: Use of AI APIs(OpenAI, Gemini, Anthropic) and coding assistants is required.</li>
+              <li>Neural Flow: Participants are expected to utilize AI models.</li>
+              <li>Individual Participation: Individual participation is allowed.</li>
+              <li>Submission Protocol: All project must be submitted before the specified deadline late submissions will not be accepted.</li>
+              <li>Plagiarism: Copying entire pre-existing project is strictly prohibited.</li>
             </ul>
           </div>
         </motion.div>
